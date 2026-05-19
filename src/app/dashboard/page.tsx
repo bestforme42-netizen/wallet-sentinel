@@ -246,8 +246,8 @@ export default function DashboardPage() {
           </>
         )}
 
-        {/* Info box */}
-        {!scanned && !loading && (
+        {/* Info box — hide when results are shown or loading */}
+        {!scanned && !loading && address === "" && (
           <GlassCard className="mt-4">
             <div className="flex items-start gap-2">
               <Info className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />

@@ -60,15 +60,14 @@ export default function HomePage() {
       {/* Tools grid */}
       <section className="max-w-lg mx-auto px-5 pb-8">
         <div className="text-xs font-mono text-gray-500 mb-4 tracking-wider text-center">SECURITY TOOLS</div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-4 gap-2">
           {tools.map((t) => {
             const Icon = t.icon;
             return (
               <Link key={t.href} href={t.href}>
-                <div className={`glass ${t.color} p-4 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer h-full`}>
-                  <Icon className="w-5 h-5 text-white/60 mb-2" />
-                  <div className="font-semibold text-white text-sm">{t.label}</div>
-                  <div className="text-[10px] text-gray-400 mt-1">{t.desc}</div>
+                <div className={`glass ${t.color} p-3 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer h-full flex flex-col items-center text-center`}>
+                  <Icon className="w-5 h-5 text-white/70 mb-1.5" />
+                  <div className="font-semibold text-white text-[10px] leading-tight">{t.label}</div>
                 </div>
               </Link>
             );
