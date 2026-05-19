@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Shield, Scan, Search, Zap, Eye, Lock } from "lucide-react";
+import { Shield, Scan, Search, Zap, Eye, Lock, Heart, Link2, BookOpen, Coins } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -15,40 +15,55 @@ export default function HomePage() {
             <span className="gradient-text">Sentinel</span>
           </h1>
           <p className="text-gray-400 mt-3 text-sm max-w-xs mx-auto">
-            Your wallet has a 24/7 bodyguard. Scan approvals, check contracts, stay safe.
+            Your all-in-one Web3 security toolkit. Scan, check, protect — across every chain.
           </p>
         </div>
       </section>
 
-      {/* Features */}
+      {/* Features grid */}
       <section className="max-w-lg mx-auto px-5 pb-8">
-        <div className="text-xs font-mono text-gray-500 mb-4 tracking-wider text-center">FEATURES</div>
-        <div className="space-y-3">
+        <div className="text-xs font-mono text-gray-500 mb-4 tracking-wider text-center">SECURITY TOOLS</div>
+        <div className="grid grid-cols-2 gap-3">
           <Link href="/dashboard">
-            <div className="glass border-cyan-400/10 p-4 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-cyan-400/10 flex items-center justify-center">
-                  <Scan className="w-5 h-5 text-cyan-400" />
-                </div>
-                <div>
-                  <div className="font-semibold text-white">Approval Scanner</div>
-                  <div className="text-xs text-gray-400 mt-0.5">Scan any wallet for risky token approvals across 7+ chains</div>
-                </div>
-              </div>
+            <div className="glass border-cyan-400/10 p-4 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer h-full">
+              <Scan className="w-6 h-6 text-cyan-400 mb-2" />
+              <div className="font-semibold text-white text-sm">Approval Scanner</div>
+              <div className="text-[10px] text-gray-400 mt-1">Scan approvals across 7+ chains</div>
             </div>
           </Link>
-
           <Link href="/checker">
-            <div className="glass border-orange-400/10 p-4 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-orange-400/10 flex items-center justify-center">
-                  <Search className="w-5 h-5 text-orange-400" />
-                </div>
-                <div>
-                  <div className="font-semibold text-white">SC Checker</div>
-                  <div className="text-xs text-gray-400 mt-0.5">Analyze smart contracts for honeypots, dangerous functions, and risks</div>
-                </div>
-              </div>
+            <div className="glass border-orange-400/10 p-4 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer h-full">
+              <Search className="w-6 h-6 text-orange-400 mb-2" />
+              <div className="font-semibold text-white text-sm">SC Checker</div>
+              <div className="text-[10px] text-gray-400 mt-1">Analyze smart contract safety</div>
+            </div>
+          </Link>
+          <Link href="/health">
+            <div className="glass border-green-400/10 p-4 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer h-full">
+              <Heart className="w-6 h-6 text-green-400 mb-2" />
+              <div className="font-semibold text-white text-sm">Wallet Health</div>
+              <div className="text-[10px] text-gray-400 mt-1">Get your safety score A-F</div>
+            </div>
+          </Link>
+          <Link href="/phishing">
+            <div className="glass border-red-400/10 p-4 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer h-full">
+              <Link2 className="w-6 h-6 text-red-400 mb-2" />
+              <div className="font-semibold text-white text-sm">Phishing Check</div>
+              <div className="text-[10px] text-gray-400 mt-1">Verify URLs before connecting</div>
+            </div>
+          </Link>
+          <Link href="/token">
+            <div className="glass border-purple-400/10 p-4 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer h-full">
+              <Coins className="w-6 h-6 text-purple-400 mb-2" />
+              <div className="font-semibold text-white text-sm">Token Risk</div>
+              <div className="text-[10px] text-gray-400 mt-1">Check tokens for scams</div>
+            </div>
+          </Link>
+          <Link href="/learn">
+            <div className="glass border-yellow-400/10 p-4 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer h-full">
+              <BookOpen className="w-6 h-6 text-yellow-400 mb-2" />
+              <div className="font-semibold text-white text-sm">Learn</div>
+              <div className="text-[10px] text-gray-400 mt-1">Interactive security lessons</div>
             </div>
           </Link>
         </div>
@@ -63,8 +78,8 @@ export default function HomePage() {
               <div className="text-[10px] text-gray-500">Chains</div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-display text-orange-400">100%</div>
-              <div className="text-[10px] text-gray-500">Client-side</div>
+              <div className="text-2xl font-bold font-display text-orange-400">6</div>
+              <div className="text-[10px] text-gray-500">Tools</div>
             </div>
             <div>
               <div className="text-2xl font-bold font-display text-purple-400">0</div>
@@ -79,10 +94,10 @@ export default function HomePage() {
         <div className="text-xs font-mono text-gray-500 mb-4 tracking-wider text-center">HOW IT WORKS</div>
         <div className="space-y-3">
           {[
-            { step: "01", title: "Paste Address", desc: "Enter any wallet address", icon: <Eye className="w-4 h-4 text-cyan-400" /> },
-            { step: "02", title: "Multi-chain Scan", desc: "Check approvals on 7+ networks", icon: <Zap className="w-4 h-4 text-orange-400" /> },
-            { step: "03", title: "Risk Assessment", desc: "AI-powered risk scoring", icon: <Shield className="w-4 h-4 text-purple-400" /> },
-            { step: "04", title: "Revoke & Protect", desc: "One-click revoke dangerous approvals", icon: <Lock className="w-4 h-4 text-green-400" /> },
+            { step: "01", title: "Paste Address", desc: "Enter any wallet or contract address", icon: <Eye className="w-4 h-4 text-cyan-400" /> },
+            { step: "02", title: "Multi-chain Scan", desc: "Check across 7+ networks simultaneously", icon: <Zap className="w-4 h-4 text-orange-400" /> },
+            { step: "03", title: "Risk Assessment", desc: "AI-powered scoring and risk analysis", icon: <Shield className="w-4 h-4 text-purple-400" /> },
+            { step: "04", title: "Take Action", desc: "Revoke, report, and protect your assets", icon: <Lock className="w-4 h-4 text-green-400" /> },
           ].map((s) => (
             <div key={s.step} className="glass border-white/5 p-3 rounded-xl">
               <div className="flex items-center gap-3">
