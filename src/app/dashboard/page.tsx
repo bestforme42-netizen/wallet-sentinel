@@ -1,314 +1,272 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import Link from "next/link";
-import { useAccount, useSendTransaction } from "wagmi";
-import { isAddress, encodeFunctionData, erc20Abi } from "viem";
-import { ConnectButton } from "@/components/ConnectButton";
-import { scoreAll, type ApprovalRecord, type RiskReport } from "@/lib/risk-engine";
-import {
-  Shield, Eye, AlertTriangle, ShieldCheck, ShieldX,
-  CheckCircle, ExternalLink, RefreshCw, Search, ChevronDown,
-} from "lucide-react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BASESCAN_BASE } from "@/lib/contracts";
+import {
+  Shield, AlertTriangle, CheckCircle, XCircle, Loader2,
+  ExternalLink, ChevronDown, Zap, RefreshCw, Info,
+} from "lucide-react";
+import NavBar from "@/components/NavBar";
+import ChainSelector from "@/components/ChainSelector";
+import GlassCard from "@/components/GlassCard";
 
-type ScanResponse = {
-  address: string;
-  scannedBlocks: { from: number; to: number };
-  activeApprovals: number;
-  approvals: Array<{
-    token: string;
-    spender: string;
-    amount: string;
-    blockNumber: number;
-    txHash: string;
-  }>;
+interface Approval {
+  token: string;
+  spender: string;
+  amountDisplay: string;
+  isUnlimited: boolean;
+  risk: {
+    level: string;
+    label: string;
+    factors: string[];
+  };
+  chainId: number;
+  chainName: string;
+  explorerLink: string;
+}
+
+const riskColors: Record<string, { bg: string; text: string; border: string }> = {
+  critical: { bg: "bg-red-400/10", text: "text-red-400", border: "border-red-400/20" },
+  high: { bg: "bg-orange-400/10", text: "text-orange-400", border: "border-orange-400/20" },
+  medium: { bg: "bg-yellow-400/10", text: "text-yellow-400", border: "border-yellow-400/20" },
+  low: { bg: "bg-blue-400/10", text: "text-blue-400", border: "border-blue-400/20" },
+  safe: { bg: "bg-green-400/10", text: "text-green-400", border: "border-green-400/20" },
 };
 
 export default function DashboardPage() {
-  const { address, isConnected } = useAccount();
-  const [target, setTarget] = useState("");
-  const [reports, setReports] = useState<RiskReport[]>([]);
-  const [scanning, setScanning] = useState(false);
+  const [address, setAddress] = useState("");
+  const [chain, setChain] = useState("all");
+  const [loading, setLoading] = useState(false);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [scanned, setScanned] = useState(false);
   const [error, setError] = useState("");
-  const [scannedAddress, setScannedAddress] = useState("");
-  const [scannedRange, setScannedRange] = useState<{ from: number; to: number } | null>(null);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
-  const handleScan = useCallback(async (addr: string) => {
-    if (!isAddress(addr)) {
-      setError("Invalid Ethereum address");
+  const handleScan = async () => {
+    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      setError("Enter a valid wallet address (0x...)");
       return;
     }
-    setScanning(true);
     setError("");
-    setScannedAddress(addr);
-    setReports([]);
+    setLoading(true);
+    setScanned(false);
 
     try {
-      const res = await fetch(`/api/scan?address=${addr}`);
-      if (!res.ok) throw new Error(`Scan failed: ${res.status}`);
-      const data: ScanResponse = await res.json();
-
-      setScannedRange(data.scannedBlocks);
-
-      const records: ApprovalRecord[] = data.approvals.map((a) => ({
-        token: a.token,
-        tokenName: a.token.slice(0, 10) + "…",
-        tokenSymbol: "?",
-        spender: a.spender,
-        amount: a.amount,
-        amountFormatted: (parseFloat(BigInt(a.amount).toString()) / 1e18).toFixed(2),
-        isUnlimited: BigInt(a.amount) >= BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'),
-        blockNumber: a.blockNumber,
-        txHash: a.txHash,
-        timestamp: 0,
-      }));
-
-      setReports(scoreAll(records));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      const chainParam = chain === "all" ? "all" : chain;
+      const res = await fetch(`/api/scan?address=${address}&chain=${chainParam}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Scan failed");
+      setApprovals(data.approvals || []);
+      setScanned(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Scan failed");
     } finally {
-      setScanning(false);
+      setLoading(false);
     }
-  }, []);
+  };
 
-  const riskCounts = {
-    critical: reports.filter((r) => r.risk === "critical").length,
-    high: reports.filter((r) => r.risk === "high").length,
-    medium: reports.filter((r) => r.risk === "medium").length,
-    low: reports.filter((r) => r.risk === "low").length,
-    safe: reports.filter((r) => r.risk === "safe").length,
+  const handleRevoke = (approval: Approval) => {
+    // Encode approve(spender, 0) calldata
+    const approveSelector = "0x095ea7b3";
+    const spenderPadded = approval.spender.toLowerCase().replace("0x", "").padStart(64, "0");
+    const zeroPadded = "0".repeat(64);
+    const calldata = approveSelector + spenderPadded + zeroPadded;
+
+    // Trigger wallet popup (MetaMask)
+    const eth = typeof window !== "undefined" ? (window as {ethereum?: {request: (a: {method: string; params: unknown[]}) => Promise<unknown>}}).ethereum : undefined;
+    if (eth) {
+      eth.request({
+        method: "eth_sendTransaction",
+        params: [{ from: address, to: approval.token, data: calldata }],
+      });
+    } else {
+      alert("Connect a wallet extension (MetaMask, Rabby, etc.) to revoke approvals.");
+    }
   };
 
   return (
-    <main className="min-h-screen pb-20">
+    <main className="min-h-dvh pb-24">
       {/* Header */}
-      <header className="max-w-6xl mx-auto px-6 pt-6 flex items-center justify-between">
-        <Link href="/" className="text-lg font-semibold inline-flex items-center gap-2">
-          <Shield className="w-5 h-5 text-neon-green" />
-          Wallet Sentinel
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-ink-mid hover:text-ink-hi text-sm transition-colors">Home</Link>
-          <ConnectButton />
+      <header className="bg-gradient-to-b from-cyan-400/5 to-transparent pt-6 pb-6 px-5">
+        <div className="max-w-lg mx-auto text-center">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400/20 to-orange-400/20 flex items-center justify-center mx-auto mb-3 border border-cyan-400/10">
+            <Shield className="w-6 h-6 text-cyan-400" />
+          </div>
+          <h1 className="text-xl font-bold font-display text-white">Approval Scanner</h1>
+          <p className="text-xs text-gray-400 mt-1">Scan any wallet for risky token approvals across all chains</p>
         </div>
       </header>
 
-      {/* Scan bar */}
-      <section className="max-w-4xl mx-auto px-6 mt-10">
-        <div className="text-xs font-mono text-ink-low mb-3">WALLET SCANNER</div>
-        <div className="panel p-4 flex items-center gap-3">
-          <div className="flex-1 flex items-center gap-2 bg-ink-bg rounded-lg px-4 py-2.5">
-            <Search className="w-4 h-4 text-ink-mid" />
-            <input
-              type="text"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder="0x… or paste any address"
-              className="bg-transparent flex-1 outline-none text-sm font-mono text-ink-hi placeholder:text-ink-mid"
-              onKeyDown={(e) => { if (e.key === "Enter") handleScan(target); }}
-            />
-          </div>
-          <button
-            onClick={() => handleScan(target || address || "")}
-            disabled={scanning || (!target && !address)}
-            className="btn-primary inline-flex items-center gap-2 shrink-0"
-          >
-            {scanning ? (
-              <><RefreshCw className="w-4 h-4 animate-spin" /> Scanning…</>
-            ) : (
-              <><Eye className="w-4 h-4" /> Scan</>
-            )}
-          </button>
-          {isConnected && address && (
+      <div className="max-w-lg mx-auto px-5">
+        {/* Scan form */}
+        <GlassCard className="mb-4">
+          <div className="space-y-3">
+            <div className="relative">
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="0x... wallet address to scan"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:border-cyan-400/40 focus:outline-none transition-colors font-mono"
+              />
+            </div>
+            <ChainSelector selected={chain} onSelect={setChain} />
             <button
-              onClick={() => handleScan(address)}
-              disabled={scanning}
-              className="btn-ghost text-xs"
-              title="Scan connected wallet"
+              onClick={handleScan}
+              disabled={loading || !address}
+              className="btn-cyan w-full flex items-center justify-center gap-2 py-3"
             >
-              My wallet
+              {loading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Scanning…</>
+              ) : (
+                <><Zap className="w-4 h-4" /> Scan Approvals</>
+              )}
             </button>
-          )}
-        </div>
+          </div>
+        </GlassCard>
 
         {error && (
-          <div className="mt-3 panel p-3 border-danger/30 text-sm text-danger flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" /> {error}
+          <div className="glass border-red-400/20 p-3 mb-4 flex items-center gap-2 text-red-400 text-sm">
+            <XCircle className="w-4 h-4 shrink-0" /> {error}
           </div>
         )}
-      </section>
 
-      {/* Results */}
-      {scannedAddress && (
-        <section className="max-w-4xl mx-auto px-6 mt-8">
-          {/* Summary row */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="text-xs font-mono text-ink-low">SCAN RESULTS</div>
-              <div className="text-sm font-mono text-ink-hi mt-1">
-                {scannedAddress.slice(0, 6)}…{scannedAddress.slice(-4)}
+        {/* Results */}
+        {scanned && (
+          <>
+            {/* Summary bar */}
+            <div className="glass border-cyan-400/10 p-3 mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm text-gray-300">
+                  Found <strong className="text-white">{approvals.length}</strong> active approvals
+                </span>
               </div>
+              <button onClick={handleScan} className="text-cyan-400 hover:text-cyan-300">
+                <RefreshCw className="w-4 h-4" />
+              </button>
             </div>
-            {scannedRange && (
-              <div className="text-xs text-ink-mid font-mono">
-                blocks {scannedRange.from} → {scannedRange.to}
+
+            {approvals.length === 0 ? (
+              <GlassCard className="text-center py-8">
+                <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-3" />
+                <div className="text-white font-semibold">All Clear!</div>
+                <div className="text-sm text-gray-400 mt-1">No risky approvals found for this wallet.</div>
+              </GlassCard>
+            ) : (
+              <div className="space-y-3">
+                {approvals.map((a, i) => {
+                  const rc = riskColors[a.risk.level] || riskColors.low;
+                  const isExpanded = expandedIdx === i;
+
+                  return (
+                    <motion.div
+                      key={`${a.chainId}-${a.token}-${a.spender}`}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                    >
+                      <GlassCard animate={false} className={`border ${rc.border}`}>
+                        <button
+                          onClick={() => setExpandedIdx(isExpanded ? null : i)}
+                          className="w-full text-left"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`chip text-[10px] ${rc.bg} ${rc.text} border ${rc.border}`}>
+                                  {a.risk.label}
+                                </span>
+                                <span className="chip text-[10px] bg-white/5 text-gray-400 border border-white/5">
+                                  {a.chainName}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-400 font-mono truncate">
+                                Token: {a.token.slice(0, 8)}…{a.token.slice(-6)}
+                              </div>
+                              <div className="text-xs text-gray-400 font-mono truncate">
+                                Spender: {a.spender.slice(0, 8)}…{a.spender.slice(-6)}
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                Amount: {a.isUnlimited ? "⚠️ Unlimited" : a.amountDisplay}
+                              </div>
+                            </div>
+                            <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                          </div>
+                        </button>
+
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="pt-3 mt-3 border-t border-white/5 space-y-3">
+                                {/* Risk factors */}
+                                <div>
+                                  <div className="text-[10px] text-gray-500 font-mono mb-2">RISK FACTORS</div>
+                                  {a.risk.factors.map((f, j) => (
+                                    <div key={j} className="flex items-start gap-2 mb-1.5">
+                                      <AlertTriangle className="w-3 h-3 text-orange-400 mt-0.5 shrink-0" />
+                                      <span className="text-xs text-gray-400">{f}</span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleRevoke(a)}
+                                    className="btn-danger flex-1 flex items-center justify-center gap-1.5 py-2 text-xs"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                    Revoke Approval
+                                  </button>
+                                  <a
+                                    href={a.explorerLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn-ghost flex items-center gap-1.5 px-3 py-2 text-xs"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </GlassCard>
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
-          </div>
+          </>
+        )}
 
-          {reports.length === 0 && !scanning && !error && (
-            <div className="panel p-8 text-center text-ink-mid">
-              No active approvals found for this address.
-            </div>
-          )}
-
-          {/* Risk summary cards */}
-          {reports.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-              {[
-                { label: "Critical", count: riskCounts.critical, cls: "border-danger/30 bg-danger/5" },
-                { label: "High", count: riskCounts.high, cls: "border-danger/20 bg-danger/3" },
-                { label: "Medium", count: riskCounts.medium, cls: "border-warn/20 bg-warn/5" },
-                { label: "Low", count: riskCounts.low, cls: "border-neon-blue/20 bg-neon-blue/5" },
-                { label: "Safe", count: riskCounts.safe, cls: "border-safe/20 bg-safe/5" },
-              ].map((c) => (
-                <div key={c.label} className={`panel p-3 border ${c.cls}`}>
-                  <div className="text-xs text-ink-mid">{c.label}</div>
-                  <div className="text-2xl font-bold mt-1">{c.count}</div>
+        {/* Info box */}
+        {!scanned && !loading && (
+          <GlassCard className="mt-4">
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
+              <div className="text-xs text-gray-400 leading-relaxed">
+                <strong className="text-white">How it works:</strong> Enter any wallet address to scan for active ERC-20 token approvals. 
+                Approvals let smart contracts spend your tokens — unlimited approvals are the #1 cause of wallet drains.
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {["ETH", "Base", "ARB", "OP", "MATIC", "BSC", "AVAX"].map((c) => (
+                    <span key={c} className="chip text-[9px] bg-white/5 text-gray-400 border border-white/5">{c}</span>
+                  ))}
+                  <span className="text-[9px] text-gray-500">+ more</span>
                 </div>
-              ))}
+              </div>
             </div>
-          )}
-
-          {/* Approval rows */}
-          <AnimatePresence>
-            {reports.map((report, i) => (
-              <motion.div
-                key={report.approval.token + report.approval.spender}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <ApprovalRow report={report} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </section>
-      )}
-    </main>
-  );
-}
-
-function ApprovalRow({ report }: { report: RiskReport }) {
-  const { approval, risk, reasons, recommendation } = report;
-  const [expanded, setExpanded] = useState(false);
-  const { sendTransaction, isPending, isSuccess } = useSendTransaction();
-
-  const riskConfig = {
-    critical: { chip: "chip-danger", icon: <ShieldX className="w-4 h-4 text-danger" />, glow: "glow-danger" },
-    high:     { chip: "chip-danger", icon: <AlertTriangle className="w-4 h-4 text-danger" />, glow: "glow-danger" },
-    medium:   { chip: "chip-warn",   icon: <AlertTriangle className="w-4 h-4 text-warn" />,   glow: "glow-warn" },
-    low:      { chip: "chip",        icon: <ShieldCheck className="w-4 h-4 text-neon-blue" />, glow: "" },
-    safe:     { chip: "chip-safe",   icon: <ShieldCheck className="w-4 h-4 text-safe" />,     glow: "glow-safe" },
-  }[risk];
-
-  const handleRevoke = () => {
-    sendTransaction({
-      to: approval.token as `0x${string}`,
-      data: encodeFunctionData({
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [approval.spender as `0x${string}`, BigInt(0)],
-      }),
-    });
-  };
-
-  return (
-    <div className={`panel p-4 mb-3 ${riskConfig.glow}`}>
-      <div
-        className="flex items-center gap-4 cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="w-10 shrink-0 flex justify-center">{riskConfig.icon}</div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-sm text-ink-hi">
-              {approval.token.slice(0, 8)}…{approval.token.slice(-4)}
-            </span>
-            <span className="text-xs text-ink-mid">→</span>
-            <span className="font-mono text-sm text-ink-hi">
-              {approval.spender.slice(0, 8)}…{approval.spender.slice(-4)}
-            </span>
-          </div>
-          <div className="text-xs text-ink-mid mt-1 flex items-center gap-2">
-            <span className={riskConfig.chip}>{risk.toUpperCase()}</span>
-            {approval.isUnlimited && (
-              <span className="chip-danger">UNLIMITED</span>
-            )}
-            <span className="text-ink-low font-mono">
-              {approval.isUnlimited ? "∞" : approval.amountFormatted} tokens
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <a
-            href={`${BASESCAN_BASE}/tx/${approval.txHash}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-ink-mid hover:text-ink-hi p-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-          {(risk === "critical" || risk === "high") && !isSuccess && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleRevoke(); }}
-              disabled={isPending}
-              className="btn-danger text-xs px-3 py-1.5"
-            >
-              {isPending ? "Revoking…" : "Revoke"}
-            </button>
-          )}
-          {isSuccess && (
-            <span className="chip-safe text-xs"><CheckCircle className="w-3 h-3" /> Revoked</span>
-          )}
-          <ChevronDown className={`w-4 h-4 text-ink-mid transition-transform ${expanded ? "rotate-180" : ""}`} />
-        </div>
+          </GlassCard>
+        )}
       </div>
 
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="pt-4 mt-4 border-t border-white/5">
-              <div className="text-xs text-ink-mid">
-                <strong className="text-ink-hi">Risk factors:</strong>{" "}
-                {reasons.join(", ") || "none detected"}
-              </div>
-              <div className="text-xs text-ink-mid mt-2">
-                <strong className="text-ink-hi">Recommendation:</strong> {recommendation}
-              </div>
-              <div className="mt-3 flex items-center gap-4 text-xs text-ink-low font-mono">
-                <span>Block: {approval.blockNumber}</span>
-                <a
-                  href={`${BASESCAN_BASE}/tx/${approval.txHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-ink-hi"
-                >
-                  TX: {approval.txHash.slice(0, 10)}…
-                </a>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      <NavBar />
+    </main>
   );
 }
