@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-ink-bg text-ink-hi font-mono;
+  min-height: 100vh;
+}
+
+/* ─── Grid backdrop ─── */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(34,197,94,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34,197,94,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ─── Panel ─── */
+.panel {
+  @apply bg-ink-panel border border-white/5 rounded-xl;
+}
+
+/* ─── Buttons ─── */
+.btn-primary {
+  @apply px-5 py-2.5 rounded-lg font-semibold text-sm transition-all;
+  @apply bg-neon-green/90 hover:bg-neon-green text-ink-bg;
+  @apply shadow-lg shadow-neon-green/10;
+}
+.btn-ghost {
+  @apply px-4 py-2 rounded-lg text-sm transition-colors;
+  @apply border border-white/10 text-ink-mid hover:text-ink-hi hover:border-white/20;
+}
+.btn-danger {
+  @apply px-5 py-2.5 rounded-lg font-semibold text-sm transition-all;
+  @apply bg-danger/90 hover:bg-danger text-white;
+  @apply shadow-lg shadow-danger/10;
+}
+
+/* ─── Chips ─── */
+.chip {
+  @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+.chip-safe { @apply chip bg-safe/15 text-safe; }
+.chip-warn { @apply chip bg-warn/15 text-warn; }
+.chip-danger { @apply chip bg-danger/15 text-danger; }
+
+/* ─── Risk glow ─── */
+.glow-safe { box-shadow: 0 0 20px rgba(34,197,94,0.15); }
+.glow-warn { box-shadow: 0 0 20px rgba(245,158,11,0.15); }
+.glow-danger { box-shadow: 0 0 20px rgba(239,68,68,0.15); }
+
+/* ─── Scanline overlay ─── */
+.scanlines::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255,255,255,0.015) 2px,
+    rgba(255,255,255,0.015) 4px
+  );
+  z-index: 9999;
+}

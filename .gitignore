@@ -1,0 +1,12 @@
+
+# Wallet Sentinel
+node_modules/
+.next/
+.env
+.env.local
+out/
+contracts/out/
+contracts/cache/
+contracts/lib/forge-std/
+contracts/lib/openzeppelin-contracts/
+
