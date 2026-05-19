@@ -1,165 +1,314 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { useAccount, useSendTransaction } from "wagmi";
+import { isAddress, encodeFunctionData, erc20Abi } from "viem";
+import { ConnectButton } from "@/components/ConnectButton";
+import { scoreAll, type ApprovalRecord, type RiskReport } from "@/lib/risk-engine";
 import {
-  Flame, Star, MapPin, Trophy, ChevronRight, Zap, Footprints, Target,
+  Shield, Eye, AlertTriangle, ShieldCheck, ShieldX,
+  CheckCircle, ExternalLink, RefreshCw, Search, ChevronDown,
 } from "lucide-react";
-import NavBar from "@/components/NavBar";
-import GlassCard from "@/components/GlassCard";
-import { currentUser, quests } from "@/data/mock";
+import { motion, AnimatePresence } from "framer-motion";
+import { BASESCAN_BASE } from "@/lib/contracts";
+
+type ScanResponse = {
+  address: string;
+  scannedBlocks: { from: number; to: number };
+  activeApprovals: number;
+  approvals: Array<{
+    token: string;
+    spender: string;
+    amount: string;
+    blockNumber: number;
+    txHash: string;
+  }>;
+};
 
 export default function DashboardPage() {
-  const user = currentUser;
-  const activeQuest = quests.find((q) => q.isActive);
-  const xpProgress = ((user.xp % 500) / 500) * 100;
+  const { address, isConnected } = useAccount();
+  const [target, setTarget] = useState("");
+  const [reports, setReports] = useState<RiskReport[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState("");
+  const [scannedAddress, setScannedAddress] = useState("");
+  const [scannedRange, setScannedRange] = useState<{ from: number; to: number } | null>(null);
+
+  const handleScan = useCallback(async (addr: string) => {
+    if (!isAddress(addr)) {
+      setError("Invalid Ethereum address");
+      return;
+    }
+    setScanning(true);
+    setError("");
+    setScannedAddress(addr);
+    setReports([]);
+
+    try {
+      const res = await fetch(`/api/scan?address=${addr}`);
+      if (!res.ok) throw new Error(`Scan failed: ${res.status}`);
+      const data: ScanResponse = await res.json();
+
+      setScannedRange(data.scannedBlocks);
+
+      const records: ApprovalRecord[] = data.approvals.map((a) => ({
+        token: a.token,
+        tokenName: a.token.slice(0, 10) + "…",
+        tokenSymbol: "?",
+        spender: a.spender,
+        amount: a.amount,
+        amountFormatted: (parseFloat(BigInt(a.amount).toString()) / 1e18).toFixed(2),
+        isUnlimited: BigInt(a.amount) >= BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'),
+        blockNumber: a.blockNumber,
+        txHash: a.txHash,
+        timestamp: 0,
+      }));
+
+      setReports(scoreAll(records));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setScanning(false);
+    }
+  }, []);
+
+  const riskCounts = {
+    critical: reports.filter((r) => r.risk === "critical").length,
+    high: reports.filter((r) => r.risk === "high").length,
+    medium: reports.filter((r) => r.risk === "medium").length,
+    low: reports.filter((r) => r.risk === "low").length,
+    safe: reports.filter((r) => r.risk === "safe").length,
+  };
 
   return (
-    <main className="min-h-dvh pb-24">
+    <main className="min-h-screen pb-20">
       {/* Header */}
-      <header className="max-w-lg mx-auto px-5 pt-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="text-3xl">{user.avatar}</div>
-          <div>
-            <div className="text-sm text-gray-400">Welcome back,</div>
-            <div className="font-bold text-white font-display">{user.name}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 chip-cyan">
-          <Flame className="w-3.5 h-3.5" />
-          {user.streak} day streak
+      <header className="max-w-6xl mx-auto px-6 pt-6 flex items-center justify-between">
+        <Link href="/" className="text-lg font-semibold inline-flex items-center gap-2">
+          <Shield className="w-5 h-5 text-neon-green" />
+          Wallet Sentinel
+        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-ink-mid hover:text-ink-hi text-sm transition-colors">Home</Link>
+          <ConnectButton />
         </div>
       </header>
 
-      {/* Level & XP */}
-      <section className="max-w-lg mx-auto px-5 mt-5">
-        <GlassCard glow="cyan">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-cyan-400/10 flex items-center justify-center text-lg font-bold text-cyan-400 font-display">
-                {user.level}
-              </div>
-              <div>
-                <div className="text-xs text-gray-400">Level</div>
-                <div className="text-sm font-semibold text-white">Crypto Explorer</div>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-400">XP</div>
-              <div className="text-sm font-bold font-mono text-cyan-400">{user.xp.toLocaleString()}</div>
-            </div>
+      {/* Scan bar */}
+      <section className="max-w-4xl mx-auto px-6 mt-10">
+        <div className="text-xs font-mono text-ink-low mb-3">WALLET SCANNER</div>
+        <div className="panel p-4 flex items-center gap-3">
+          <div className="flex-1 flex items-center gap-2 bg-ink-bg rounded-lg px-4 py-2.5">
+            <Search className="w-4 h-4 text-ink-mid" />
+            <input
+              type="text"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="0x… or paste any address"
+              className="bg-transparent flex-1 outline-none text-sm font-mono text-ink-hi placeholder:text-ink-mid"
+              onKeyDown={(e) => { if (e.key === "Enter") handleScan(target); }}
+            />
           </div>
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${xpProgress}%` }} />
+          <button
+            onClick={() => handleScan(target || address || "")}
+            disabled={scanning || (!target && !address)}
+            className="btn-primary inline-flex items-center gap-2 shrink-0"
+          >
+            {scanning ? (
+              <><RefreshCw className="w-4 h-4 animate-spin" /> Scanning…</>
+            ) : (
+              <><Eye className="w-4 h-4" /> Scan</>
+            )}
+          </button>
+          {isConnected && address && (
+            <button
+              onClick={() => handleScan(address)}
+              disabled={scanning}
+              className="btn-ghost text-xs"
+              title="Scan connected wallet"
+            >
+              My wallet
+            </button>
+          )}
+        </div>
+
+        {error && (
+          <div className="mt-3 panel p-3 border-danger/30 text-sm text-danger flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" /> {error}
           </div>
-          <div className="text-[10px] text-gray-500 mt-1 text-right">
-            {user.xp % 500} / 500 XP to Level {user.level + 1}
-          </div>
-        </GlassCard>
+        )}
       </section>
 
-      {/* Quick stats */}
-      <section className="max-w-lg mx-auto px-5 mt-4 grid grid-cols-3 gap-3">
-        {[
-          { icon: <Star className="w-4 h-4 text-orange-400" />, label: "Points", value: user.points.toLocaleString() },
-          { icon: <Trophy className="w-4 h-4 text-purple-400" />, label: "Badges", value: user.badges.length },
-          { icon: <Target className="w-4 h-4 text-green-400" />, label: "Quests", value: user.questsCompleted },
-        ].map((s) => (
-          <GlassCard key={s.label} animate={false} className="text-center py-3">
-            <div className="flex justify-center mb-1">{s.icon}</div>
-            <div className="text-lg font-bold font-display text-white">{s.value}</div>
-            <div className="text-[10px] text-gray-500">{s.label}</div>
-          </GlassCard>
-        ))}
-      </section>
-
-      {/* Active Quest */}
-      {activeQuest && (
-        <section className="max-w-lg mx-auto px-5 mt-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-xs font-mono text-gray-500 tracking-wider">ACTIVE QUEST</div>
-            <Link href="/map" className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
-              View All <ChevronRight className="w-3 h-3" />
-            </Link>
+      {/* Results */}
+      {scannedAddress && (
+        <section className="max-w-4xl mx-auto px-6 mt-8">
+          {/* Summary row */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-xs font-mono text-ink-low">SCAN RESULTS</div>
+              <div className="text-sm font-mono text-ink-hi mt-1">
+                {scannedAddress.slice(0, 6)}…{scannedAddress.slice(-4)}
+              </div>
+            </div>
+            {scannedRange && (
+              <div className="text-xs text-ink-mid font-mono">
+                blocks {scannedRange.from} → {scannedRange.to}
+              </div>
+            )}
           </div>
-          <Link href={`/quest/${activeQuest.id}`}>
-            <GlassCard glow="orange" className="cursor-pointer hover:bg-white/[0.06] transition-colors">
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">{activeQuest.icon}</div>
-                <div className="flex-1">
-                  <div className="font-semibold text-white">{activeQuest.title}</div>
-                  <div className="text-xs text-gray-400 mt-1">{activeQuest.movementGoal}</div>
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                      <span className="flex items-center gap-1">
-                        <Footprints className="w-3 h-3" /> Progress
-                      </span>
-                      <span>{Math.round(activeQuest.movementProgress * 100)}%</span>
-                    </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${activeQuest.movementProgress * 100}%` }} />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 mt-3">
-                    <span className="chip-cyan text-[10px]">+{activeQuest.rewardXP} XP</span>
-                    <span className="chip-orange text-[10px]">+{activeQuest.rewardPoints} pts</span>
-                    <span className={`chip text-[10px] ${
-                      activeQuest.difficulty === "easy" ? "chip-success" :
-                      activeQuest.difficulty === "medium" ? "chip-orange" : "chip-danger"
-                    }`}>
-                      {activeQuest.difficulty}
-                    </span>
-                  </div>
+
+          {reports.length === 0 && !scanning && !error && (
+            <div className="panel p-8 text-center text-ink-mid">
+              No active approvals found for this address.
+            </div>
+          )}
+
+          {/* Risk summary cards */}
+          {reports.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+              {[
+                { label: "Critical", count: riskCounts.critical, cls: "border-danger/30 bg-danger/5" },
+                { label: "High", count: riskCounts.high, cls: "border-danger/20 bg-danger/3" },
+                { label: "Medium", count: riskCounts.medium, cls: "border-warn/20 bg-warn/5" },
+                { label: "Low", count: riskCounts.low, cls: "border-neon-blue/20 bg-neon-blue/5" },
+                { label: "Safe", count: riskCounts.safe, cls: "border-safe/20 bg-safe/5" },
+              ].map((c) => (
+                <div key={c.label} className={`panel p-3 border ${c.cls}`}>
+                  <div className="text-xs text-ink-mid">{c.label}</div>
+                  <div className="text-2xl font-bold mt-1">{c.count}</div>
                 </div>
-              </div>
-            </GlassCard>
-          </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Approval rows */}
+          <AnimatePresence>
+            {reports.map((report, i) => (
+              <motion.div
+                key={report.approval.token + report.approval.spender}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <ApprovalRow report={report} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </section>
       )}
-
-      {/* Recent Badges */}
-      <section className="max-w-lg mx-auto px-5 mt-5">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-xs font-mono text-gray-500 tracking-wider">RECENT BADGES</div>
-          <Link href="/wallet" className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
-            View All <ChevronRight className="w-3 h-3" />
-          </Link>
-        </div>
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {user.badges.map((badgeId, i) => (
-            <motion.div
-              key={badgeId}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 * i }}
-              className="glass p-3 border-white/5 min-w-[100px] text-center shrink-0"
-            >
-              <div className="text-3xl mb-1">{["🎣", "🔐", "🛡️"][i]}</div>
-              <div className="text-[10px] text-gray-400">{["Phishing", "Seed Guard", "Wallet"][i]}</div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* Quick Actions */}
-      <section className="max-w-lg mx-auto px-5 mt-5 grid grid-cols-2 gap-3">
-        <Link href="/map">
-          <GlassCard className="cursor-pointer hover:bg-white/[0.06] transition-colors text-center py-5">
-            <MapPin className="w-6 h-6 text-cyan-400 mx-auto mb-2" />
-            <div className="text-sm font-semibold text-white">Open Map</div>
-            <div className="text-[10px] text-gray-500 mt-0.5">Find quests nearby</div>
-          </GlassCard>
-        </Link>
-        <Link href="/leaderboard">
-          <GlassCard className="cursor-pointer hover:bg-white/[0.06] transition-colors text-center py-5">
-            <Zap className="w-6 h-6 text-orange-400 mx-auto mb-2" />
-            <div className="text-sm font-semibold text-white">Leaderboard</div>
-            <div className="text-[10px] text-gray-500 mt-0.5">See your rank</div>
-          </GlassCard>
-        </Link>
-      </section>
-
-      <NavBar />
     </main>
+  );
+}
+
+function ApprovalRow({ report }: { report: RiskReport }) {
+  const { approval, risk, reasons, recommendation } = report;
+  const [expanded, setExpanded] = useState(false);
+  const { sendTransaction, isPending, isSuccess } = useSendTransaction();
+
+  const riskConfig = {
+    critical: { chip: "chip-danger", icon: <ShieldX className="w-4 h-4 text-danger" />, glow: "glow-danger" },
+    high:     { chip: "chip-danger", icon: <AlertTriangle className="w-4 h-4 text-danger" />, glow: "glow-danger" },
+    medium:   { chip: "chip-warn",   icon: <AlertTriangle className="w-4 h-4 text-warn" />,   glow: "glow-warn" },
+    low:      { chip: "chip",        icon: <ShieldCheck className="w-4 h-4 text-neon-blue" />, glow: "" },
+    safe:     { chip: "chip-safe",   icon: <ShieldCheck className="w-4 h-4 text-safe" />,     glow: "glow-safe" },
+  }[risk];
+
+  const handleRevoke = () => {
+    sendTransaction({
+      to: approval.token as `0x${string}`,
+      data: encodeFunctionData({
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [approval.spender as `0x${string}`, BigInt(0)],
+      }),
+    });
+  };
+
+  return (
+    <div className={`panel p-4 mb-3 ${riskConfig.glow}`}>
+      <div
+        className="flex items-center gap-4 cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="w-10 shrink-0 flex justify-center">{riskConfig.icon}</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-sm text-ink-hi">
+              {approval.token.slice(0, 8)}…{approval.token.slice(-4)}
+            </span>
+            <span className="text-xs text-ink-mid">→</span>
+            <span className="font-mono text-sm text-ink-hi">
+              {approval.spender.slice(0, 8)}…{approval.spender.slice(-4)}
+            </span>
+          </div>
+          <div className="text-xs text-ink-mid mt-1 flex items-center gap-2">
+            <span className={riskConfig.chip}>{risk.toUpperCase()}</span>
+            {approval.isUnlimited && (
+              <span className="chip-danger">UNLIMITED</span>
+            )}
+            <span className="text-ink-low font-mono">
+              {approval.isUnlimited ? "∞" : approval.amountFormatted} tokens
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <a
+            href={`${BASESCAN_BASE}/tx/${approval.txHash}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-ink-mid hover:text-ink-hi p-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+          {(risk === "critical" || risk === "high") && !isSuccess && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleRevoke(); }}
+              disabled={isPending}
+              className="btn-danger text-xs px-3 py-1.5"
+            >
+              {isPending ? "Revoking…" : "Revoke"}
+            </button>
+          )}
+          {isSuccess && (
+            <span className="chip-safe text-xs"><CheckCircle className="w-3 h-3" /> Revoked</span>
+          )}
+          <ChevronDown className={`w-4 h-4 text-ink-mid transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-4 mt-4 border-t border-white/5">
+              <div className="text-xs text-ink-mid">
+                <strong className="text-ink-hi">Risk factors:</strong>{" "}
+                {reasons.join(", ") || "none detected"}
+              </div>
+              <div className="text-xs text-ink-mid mt-2">
+                <strong className="text-ink-hi">Recommendation:</strong> {recommendation}
+              </div>
+              <div className="mt-3 flex items-center gap-4 text-xs text-ink-low font-mono">
+                <span>Block: {approval.blockNumber}</span>
+                <a
+                  href={`${BASESCAN_BASE}/tx/${approval.txHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-ink-hi"
+                >
+                  TX: {approval.txHash.slice(0, 10)}…
+                </a>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

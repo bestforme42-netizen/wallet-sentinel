@@ -1,113 +1,158 @@
-# 🎯 Move & Solve — AR Crypto Treasure Quest
+# 🔭 Wallet Sentinel — Autonomous Wallet Security Agent
 
-> **Walk. Discover. Solve.**
+> **Your wallet has a 24/7 bodyguard.**
 
-A gamified Web3 treasure-hunt app where users explore real-world locations, solve crypto-safety puzzles, earn NFT badges, and redeem merchant rewards. Built for the Xiaomi ecosystem hackathon.
+An AI-powered wallet monitoring platform built on Base. Wallet Sentinel scans ERC-20 approvals, scores them with a multi-factor risk engine, and alerts you *before* a drain happens. The autonomous agent loop runs 24/7 — you sleep, Sentinel watches.
+
+---
 
 ## 🚀 Live Demo
 
 | | |
 |---|---|
-| **App** | https://wallet-sentinel.vercel.app |
-| **Repo** | https://github.com/bestforme42-netizen/wallet-sentinel |
-| **Network** | Base Sepolia (mock mode) |
+| **App**     | https://wallet-sentinel.vercel.app |
+| **Repo**    | https://github.com/bestforme42-netizen/wallet-sentinel |
+| **Network** | Base Sepolia (chainId 84532) |
 
-## 🎮 Try It
+### Try It in 60 Seconds
+1. Visit https://wallet-sentinel.vercel.app
+2. Connect any injected wallet (MetaMask, OKX, Rabby) on Base Sepolia
+3. Click "Scan" — Sentinel fetches all your ERC-20 Approval events on-chain
+4. See risk scores: 🔴 Critical → unlimited approval to unknown contract, etc.
+5. Click "Revoke" on dangerous approvals — wallet pops up with pre-encoded approve(0)
+6. Set up Telegram alerts (coming soon) for autonomous 24/7 monitoring
 
-1. Visit the live demo
-2. Click **"Start Quest"** → choose Wallet or Email login
-3. Explore the **Dashboard** — see XP, level, streak, badges
-4. Open **Quest Map** — see 4 nearby treasure locations
-5. Tap a quest → **Start Quest** → AR Discovery mock
-6. **Scan the clue** → solve the crypto-safety puzzle
-7. Earn **XP + Points + NFT Badge** → share your achievement
-8. Visit **Rewards** → redeem points for merchant vouchers
+---
+
+## 🎯 The Problem
+
+Crypto users lose **$billions** to approval-based drains every year. The pattern is always the same:
+1. User signs a malicious approval (unlimited, to unknown contract)
+2. Drainer contract sweeps tokens hours/days later
+3. User realizes too late — "I didn't know that approval was dangerous"
+
+There's no real-time watchdog for approvals. Until now.
+
+---
 
 ## 🏗️ Architecture
 
 ```
-src/
-├── app/
-│   ├── page.tsx              Landing page
-│   ├── auth/                 Connect wallet / social login
-│   ├── dashboard/            User stats, active quest, badges
-│   ├── map/                  Quest map with markers
-│   ├── quest/[id]/           Quest detail
-│   ├── quest/[id]/ar/        AR discovery mock
-│   ├── quest/[id]/puzzle/    Crypto-safety quiz
-│   ├── quest/[id]/reward/    Badge mint + XP celebration
-│   ├── wallet/               NFT badges, quest history, on-chain activity
-│   ├── leaderboard/          Weekly rankings
-│   └── rewards/              Merchant voucher redemption
-├── components/
-│   ├── NavBar.tsx            Bottom navigation
-│   └── GlassCard.tsx         Reusable glassmorphism card
-├── data/
-│   └── mock.ts               All demo data (users, quests, puzzles, badges, rewards)
-├── store/
-│   └── app.ts                Zustand global state
-└── lib/
-    └── utils.ts              cn() helper
+                    ┌─ Web Dashboard ──────────┐
+   User ──SIWE────▶│  Scan approvals          │
+                    │  Risk analysis UI        │
+                    │  One-click revoke        │
+                    └────────┬─────────────────┘
+                             │
+              ┌────── AI Agent Loop ──────────────┐
+              │  Hermes cron (every 5 min)        │
+              │  1. Fetch new Approval events     │
+              │  2. Score each with risk engine   │
+              │  3. LLM-summarize findings        │
+              │  4. Push alert if threshold met   │
+              └──────────┬───────────────────────┘
+                         ▼
+              ┌─ Telegram Bot ────────────────────┐
+              │  Real-time alerts                 │
+              │  Inline revoke buttons            │
+              │  /status, /add, /list commands    │
+              └───────────────────────────────────┘
 ```
 
-## 🧪 Demo Flow (12 Steps)
+---
 
-| Step | Page | What Happens |
-|------|------|--------------|
-| 1 | Landing | Hero, features, Xiaomi section, Web3 safety |
-| 2 | Auth | Wallet connect or email social login |
-| 3 | Dashboard | XP bar, level, streak, active quest, badges |
-| 4 | Quest Map | Interactive map mock with 4 quest markers |
-| 5 | Map List | Quest cards with difficulty, distance, rewards |
-| 6 | Quest Detail | Story, briefing, difficulty stars, reward preview |
-| 7 | AR Discovery | Camera mock, floating clue, scan animation |
-| 8 | Puzzle | Crypto-safety quiz with instant feedback |
-| 9 | Explanation | Educational content after answer |
-| 10 | Reward | Badge mint animation, XP/points, share button |
-| 11 | Wallet | NFT gallery, quest history, on-chain mock |
-| 12 | Leaderboard | Weekly rankings, top 3 podium |
-| 13 | Rewards | Merchant vouchers, QR code redemption mock |
+## 🔍 Risk Scoring Engine
 
-## 🛠️ Tech Stack
+Multi-factor heuristic engine (`src/lib/risk-engine.ts`) scores every approval:
 
-- **Next.js 14** — App Router, TypeScript, SSR
-- **Tailwind CSS** — Xiaomi dark theme (navy, cyan, orange, purple)
-- **Framer Motion** — page transitions, staggered animations, floating effects
-- **Zustand** — lightweight global state
-- **Lucide React** — icon library
-- **Glassmorphism** — blur + subtle borders on every card
+| Risk Level | Trigger |
+|-----------|---------|
+| 🔴 **Critical** | Unlimited approval to unknown contract |
+| 🟠 **High** | Unlimited approval (even to known protocols) |
+| 🟡 **Medium** | Non-unlimited to unknown spender |
+| 🔵 **Low** | Approval to known safe spender (Uniswap, Base Bridge) |
+| 🟢 **Safe** | Known safe spender, reasonable amount |
 
-## 🎨 UI Design
+Each approval gets a recommendation: "Revoke immediately", "Replace with exact amount", etc.
 
-- **Mobile-first** — every page designed for 375px width
-- **Dark navy** background (#0a0e1a)
-- **Neon cyan** (#00e5ff) for primary actions
-- **Electric orange** (#ff6d00) for rewards/points
-- **Soft purple** (#b388ff) for badges/rare items
-- **Glassmorphism** panels with blur + border
-- **Floating animations** on map markers
-- **Progress bars** with gradient fills
-- **Scanline effects** on AR overlay
+---
 
-## 📦 Local Development
+## 📜 Smart Contract (Base Sepolia)
+
+| Contract | Address |
+|----------|---------|
+| **PanicRevoke** (utility) | *deploying soon — pending Base Sepolia ETH* |
+
+PanicRevoke provides:
+- `batchAllowance(owner, targets)` — batch-read allowances for display
+- `canRevoke(owner, token, spender)` — check if revoke is needed
+- `encodeRevoke(token, spender)` — generate approve(0) calldata for wallet popup
+
+Actual revocation happens via the wallet calling `approve(spender, 0)` directly on each token contract — approvals are keyed to `msg.sender`, so only the wallet can revoke its own approvals.
+
+---
+
+## 🧪 Tests
+
+| Suite | Status |
+|-------|--------|
+| `forge test --match-contract PanicRevokeTest` | 5/5 ✅ |
+| Next.js build | ✅ |
+| Scan API endpoint | ✅ (returns JSON on valid address) |
+
+---
+
+## 📂 Repo Structure
+
+```
+wallet-sentinel/
+├── contracts/                    Foundry project
+│   ├── src/
+│   │   └── PanicRevoke.sol       Batch allowance reader + calldata encoder
+│   └── test/
+│       └── PanicRevoke.t.sol     5 tests (batch read, canRevoke, encodeRevoke)
+└── src/
+    ├── app/
+    │   ├── page.tsx               Landing page
+    │   ├── dashboard/             Scan + risk analysis + revoke UI
+    │   └── api/
+    │       └── scan/route.ts      Fetch Approval events via RPC
+    ├── lib/
+    │   ├── wagmi.ts               Base Sepolia + mainnet config
+    │   ├── risk-engine.ts         Multi-factor risk scoring
+    │   └── contracts.ts           ABI + constants
+    └── components/
+        ├── Providers.tsx           Wagmi + QueryClient
+        └── ConnectButton.tsx      Multi-injected wallet connect
+```
+
+---
+
+## 🛠️ Local Development
 
 ```bash
 git clone https://github.com/bestforme42-netizen/wallet-sentinel.git
 cd wallet-sentinel
 npm install
-npm run dev    # http://localhost:3000
+npm run dev            # http://localhost:3000
+
+# Contracts
+cd contracts
+forge build && forge test -vv
 ```
+
+---
 
 ## 🌱 What's Next
 
-- Real wallet integration (wagmi + MetaMask)
-- GPS-based checkpoint verification
-- Camera-based AR clue discovery
-- On-chain NFT minting (Base Sepolia → Mainnet)
-- Supabase user persistence
-- Mi Band / Xiaomi fitness tracker step integration
-- Merchant partner onboarding
-- Multi-language support
+- **Telegram bot** — real-time alerts via `@WalletSentinelBot`
+- **Autonomous cron agent** — Hermes loop scans every 5 min, LLM-summarizes risk
+- **Supabase integration** — persistent watch lists + SIWE auth
+- **Multi-chain** — Ethereum mainnet, Polygon, Arbitrum
+- **Permit2 detection** — flag Permit2 signatures with unlimited amounts
+- **Deployed contract** — PanicRevoke deployed on Base for batch-revoke UX
+
+---
 
 ## 📜 License
 

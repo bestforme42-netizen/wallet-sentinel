@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.62.7",
     "clsx": "^2.1.1",
     "framer-motion": "^12.39.0",
     "lucide-react": "^1.16.0",
@@ -16,6 +17,8 @@
     "react": "^18",
     "react-dom": "^18",
     "tailwind-merge": "^3.6.0",
+    "viem": "^2.21.55",
+    "wagmi": "^2.14.16",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
