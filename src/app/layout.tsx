@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
-import { Providers } from "@/components/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Wallet Sentinel — Autonomous Wallet Security Agent",
-  description: "AI-powered wallet monitoring. Detects risky approvals, scam tokens, and drain attempts before it's too late.",
+  title: "Move & Solve — AR Crypto Treasure Quest",
+  description: "Explore real-world locations, solve crypto puzzles, earn NFT badges, and redeem rewards.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="grid-bg scanlines">
-        <Providers>{children}</Providers>
+    <html lang="en" className="dark">
+      <body className="min-h-dvh bg-navy-900 text-gray-200 antialiased">
+        {children}
       </body>
     </html>
   );
