@@ -10,12 +10,12 @@ An AI-powered wallet monitoring platform built on Base. Wallet Sentinel scans ER
 
 | | |
 |---|---|
-| **App**     | https://wallet-sentinel.vercel.app |
+| **App**     | https://wallet-sentinel-tools.vercel.app |
 | **Repo**    | https://github.com/bestforme42-netizen/wallet-sentinel |
 | **Network** | Base Sepolia (chainId 84532) |
 
 ### Try It in 60 Seconds
-1. Visit https://wallet-sentinel.vercel.app
+1. Visit https://wallet-sentinel-tools.vercel.app
 2. Connect any injected wallet (MetaMask, OKX, Rabby) on Base Sepolia
 3. Click "Scan" — Sentinel fetches all your ERC-20 Approval events on-chain
 4. See risk scores: 🔴 Critical → unlimited approval to unknown contract, etc.
